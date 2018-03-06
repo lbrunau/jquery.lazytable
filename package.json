@@ -1,0 +1,23 @@
+{
+  "name": "jquery.lazytable",
+  "version": "0.0.1",
+  "description": "jQuery plugin for huge tables - rendering visible rows only",
+  "license": "MIT",
+  "author": "lbrunau",
+  "keywords": [],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lbrunau/jquery.lazytable"
+  },
+  "scripts": {
+    "build": "webpack --mode development --config webpack.dev.js",
+    "deploy": "webpack --mode production --config webpack.prod.js"
+  },
+  "devDependencies": {
+    "babel-preset-env": "^1.6.1",
+    "uglifyjs-webpack-plugin": "^1.2.2",
+    "webpack": "^4.0.1",
+    "webpack-cli": "^2.0.9",
+    "webpack-merge": "^4.1.2"
+  }
+}
