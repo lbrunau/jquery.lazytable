@@ -13,6 +13,13 @@ This jQuery plugin is a variant of infinite scroll for tables (although, it curr
 Include the dist/jquery.lazytable.min.js file and jQuery (tested with Version 2).
 
 Make your table scrollable by introducing a wrapper div that encloses your table. The wrapper div should have a CSS height and `overflow-y: scroll` set.
+```html
+<div id="tableWrapper" style="height: 200px; overflow-y: scroll">
+  <table>
+    <tbody></tbody>
+  </table>
+</div>
+```
 
 ```javascript
 const tableData = [
