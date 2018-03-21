@@ -1,0 +1,38 @@
+<html>
+  <head>
+    <title>TEST</title>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
+    <script type="text/javascript" src="../dist/jquery.lazytable.min.js"></script>
+    <style type="text/css">
+    .tableWrapper { height: 200px; width: 40em; overflow-y: scroll; border: 1px solid black; }
+    td tr table { padding: 0; margin: 0; }
+    td { width: 5em; }
+    </style>
+    <script>
+    var data = [];
+    for(var i = 1; i <= 2000; i++) {
+    	var row = [];
+    	for(var j = 0; j < 8; j++) {
+    		row.push(String.fromCharCode(65 + j) + i);
+    	}
+    	data.push(row);
+    }
+    
+    $(document).ready(function() {
+    	$('.tableWrapper').LazyTable({
+    		debug: true,
+    		data: data
+    	});
+    	$('.nRows').text(data.length);
+    });
+    </script>
+  </head>
+  <body>
+    <div class="tableWrapper" style="height: 200px; overflow-y: scroll;">
+      <table>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="tableInfo">Rows: <span class="nRows"></span></div>
+  </body>
+</html>
