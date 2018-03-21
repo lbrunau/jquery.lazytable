@@ -49,7 +49,7 @@ $('#tableWrapper').LazyTable({
 
 ## TODO
 * Restart plugin when doing rapid scrolls.
-* Automatically add wrapper div to provide scrolling. Give hight as an initialisation parameter.
+* Automatically add wrapper div to provide scrolling. Give height as an initialization parameter.
 * Allow underlying data set to be extended on demand.
 * Provide a more abstract model of the underlying data, to allow data being fetched from WebWorkers, JavaScript databases, etc.
 
