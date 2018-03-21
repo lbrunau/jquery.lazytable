@@ -5,8 +5,10 @@
     <script type="text/javascript" src="/jquery.lazytable.js"></script>
     <style type="text/css">
     .tableWrapper { height: 200px; width: 40em; overflow-y: scroll; border: 1px solid black; }
+    table {border-collapse: collapse; }
     td tr table { padding: 0; margin: 0; }
     td { width: 5em; }
+    tr.focused { background-color: #ddd; }
     </style>
     <script>
     var data = [];
@@ -21,9 +23,19 @@
     $(document).ready(function() {
     	$('.tableWrapper').LazyTable({
     		debug: true,
-    		data: data
+    		data: data,
+    		generator: function(row) { return '<tr id="' + row[0].substr(1) + '"><td>' + row.join('</td><td>') + '</td></tr>'; }
     	});
     	$('.nRows').text(data.length);
+    	$('#rowNumber').attr('max', data.length);
+    	$('#focus').on('click', function() {
+    		const i = parseInt($('#rowNumber').val());
+    		if(i > 0 && i <= data.length) {
+        		$('.tableWrapper').trigger('lazytable:focus', i-1);
+        		$('.tableWrapper tr.focused').removeClass('focused');
+        		$('.tableWrapper tr#' + i).addClass('focused');
+    		}
+    	});
     });
     </script>
   </head>
@@ -34,5 +46,6 @@
       </table>
     </div>
     <div class="tableInfo">Rows: <span class="nRows"></span></div>
+    <div class="focus"><label for="rowNumber">Focus: </label><input id="rowNumber" name= "rowNumber" type="number" min="1"/><button id="focus">Go</button></div>
   </body>
 </html>

@@ -64,7 +64,6 @@ export default function LazyTable(options) {
 	const buildDown = function() {
 		const deferred = $.Deferred();
 		const anim = function(taskStartTime) {
-
 			var html = [];
 			var n = 0;
 
@@ -141,9 +140,37 @@ export default function LazyTable(options) {
 			}
 		}
 	};
+
+	/*
+	 * Get the desired window based on current scroll position.
+	 */
+	const calcTargetWindow = function() {
+		const scrollTop = that.scrollTop();
+		const w = {
+			top: Math.max(Math.floor(scrollTop / settings.trHeight) - settings.prefetch, 0),
+			bottom: Math.min(Math.ceil((scrollTop + that.innerHeight()) / settings.trHeight) + settings.prefetch, settings.data.length - 1)
+		};
+		w.center = Math.min(Math.floor(w.bottom + w.top / 2), settings.data.length - 1);
+		
+		return w;
+	};
+	
+	/* 
+	 * Get the currently drawn window.
+	 */
+	const calcCurrentWindow = function() {
+		const w = {
+			top: prevIter.getCurrent(),
+			bottom: nextIter.getCurrent()
+		};
+		w.center = Math.min(Math.floor(w.bottom + w.top / 2), settings.data.length - 1);
+		
+		return w;
+	};
 	
 	const update = function() {
-		const updateDeferred = $.Deferred();
+		const targetWindow = calcTargetWindow();
+		const currentWindow = calcCurrentWindow();
 		
 		const finalizeRedraw = function() {
 			if(!settings.keepExisting) {
@@ -170,15 +197,13 @@ export default function LazyTable(options) {
 			}
 		};
 
-		const scrollTop = that.scrollTop();
-		
-		workingDown = Math.min(Math.ceil((scrollTop + that.innerHeight()) / settings.trHeight) + settings.prefetch, settings.data.length - 1);
-		workingUp = Math.max(Math.floor(scrollTop / settings.trHeight) - settings.prefetch, 0);
+		workingDown = targetWindow.bottom;
+		workingUp = targetWindow.top;
 		
 		var animations = [];
 		
 		// only start animation if it is not currently active
-		if(!downAnimationWorking && workingDown >= nextIter.getCurrent()) {
+		if(!downAnimationWorking && targetWindow.bottom >= currentWindow.bottom) {
 			var downDeferred = $.Deferred();
 			downAnimationWorking = true;
 			buildDown().done(function() {
@@ -189,7 +214,7 @@ export default function LazyTable(options) {
 			animations.push(downDeferred);
 		}
 		
-		if(!upAnimationWorking && workingUp < prevIter.getCurrent()) {
+		if(!upAnimationWorking && targetWindow.top < currentWindow.top) {
 			var upDeferred = $.Deferred();
 			upAnimationWorking = true;
 			buildUp().done(function() {
@@ -200,12 +225,7 @@ export default function LazyTable(options) {
 			animations.push(upDeferred);
 		} 
 		
-		$.when(animations).done(function() {
-			// wait for both animations
-			updateDeferred.resolve();
-		});
-		
-		return updateDeferred.promise();
+		return $.when(animations).then(finalizeRedraw);
 	};
 	
 	/* Move index to center of window, if possible. */
@@ -223,12 +243,12 @@ export default function LazyTable(options) {
 	};
 	
 	const focus = function(index) {
-		const focusDeferred = $.Deferred();
+		const currentWindow = calcCurrentWindow();
+		focusedIndex = index;
 		
-		const startIndex = prevIter.getCurrent();
-		const endIndex = nextIter.getCurrent();
-		
-		if(startIndex <= index && index < endIndex) {
+		if(currentWindow.top <= index && index < currentWindow.bottom) {
+			const focusDeferred = $.Deferred();
+			
 			/*
 			 * If the desired index is within the currently active area,
 			 * the table window will scroll until the desired index reaches
@@ -250,20 +270,20 @@ export default function LazyTable(options) {
 				that.scrollTop(scrollTop);	
 			}
 			window.setTimeout(function() { focusDeferred.resolve(); }, 16);
-		} else {
-			/*
-			 * If desired index is not within currently active area,
-			 * the table will be rebuilt from scratch. 
-			 */
-			start(index, false).then(function() {
-				return center(index);
-			}).then(update).always(function() {
-				focusDeferred.resolve();
-			});
+			return focusDeferred.promise();
 		}
-		
-		focusedIndex = index;
-		return focusDeferred.promise();
+
+		/*
+		 * Else: If desired index is not within currently active area,
+		 * the table will be rebuilt from scratch. 
+		 */
+		return restart(index);
+	};
+	
+	const restart = function(index) {
+		return start(index, false).then(function() {
+			return center(index);
+		}).then(update);
 	};
 	
 	const start = function(index, calcTrHeight) {
@@ -335,22 +355,15 @@ export default function LazyTable(options) {
 				
 				const startIndex = focusedIndex ? focusedIndex : Math.min(Math.floor((prevIter.getCurrent() + nextIter.getCurrent()) / 2), settings.data.length -1);
 				
-				start(startIndex, false).then(function() {
-					return center(startIndex);
-				}).always(function() {
-					resizeDeferred.resolve();
-				});
-			} else if(focusedIndex) {
+				return restart(startIndex);
+			}
+			
+			if(focusedIndex) {
 				// height has not changed, but focuse row 
 				// might have gone out of visible area
-				focus(focusedIndex).always(function() { resizeDeferred.resolve(); });
-			} else {
-				// nothing to do
-				resizeDeferred.resolve();
+				return focus(focusedIndex);
 			}
-		}).fail(function() {
-			// no rows in table
-			resizeDeferred.reject();
+			// else: nothing to do
 		});
 		
 		return resizeDeferred.promise();
