@@ -77,7 +77,7 @@ export default function LazyTable(options) {
 				table.css({'margin-bottom': (settings.data.length - nextIter.getCurrent()) * settings.trHeight});
 			}
 			if(settings.debug) {
-				console.log('[TableWindow] bot +' + n + ' rows');					
+				console.log('[jQuery.Lazytable] bot +' + n + ' rows');					
 			}
 			if(nextIter.getCurrent() <= workingDown) {
 				window.requestAnimationFrame(anim);
@@ -104,7 +104,7 @@ export default function LazyTable(options) {
 			}
 
 			if(settings.debug) {
-				console.log('[TableWindow] top +' + n + ' rows');					
+				console.log('[jQuery.Lazytable] top +' + n + ' rows');					
 			}
 			if(prevIter.getCurrent() > workingUp) {
 				window.requestAnimationFrame(anim);
@@ -129,7 +129,7 @@ export default function LazyTable(options) {
 			settings.deleteFn(cleaningUp - end); // index will be negative - so removed from the end of the list
 			table.css({'margin-bottom': (settings.data.length - cleaningUp) * settings.trHeight});
 			if(settings.debug) {
-				console.log('[TableWindow] bot -' + (end - cleaningUp) + ' rows');					
+				console.log('[jQuery.Lazytable] bot -' + (end - cleaningUp) + ' rows');					
 			}
 		}
 		if(!upAnimationWorking && cleaningDown > start) {
@@ -137,7 +137,7 @@ export default function LazyTable(options) {
 			settings.deleteFn(0, cleaningDown - start);
 			table.css({'margin-top': cleaningDown * settings.trHeight});
 			if(settings.debug) {
-				console.log('[TableWindow] top -' + (cleaningDown - start) + ' rows');					
+				console.log('[jQuery.Lazytable] top -' + (cleaningDown - start) + ' rows');					
 			}
 		}
 	};
@@ -155,7 +155,7 @@ export default function LazyTable(options) {
 				const marginTop = parseInt(marginTopStr.substr(0, marginTopStr.length - 2));
 				const marginBotStr = table.css('margin-bottom');
 				const marginBot = parseInt(marginBotStr.substr(0, marginBotStr.length - 2));
-				console.log('[TableWindow] nVisible: ' + n);
+				console.log('[jQuery.Lazytable] nVisible: ' + n);
 				console.assert(((marginTop + marginBot) == (settings.data.length - n) * settings.trHeight), {
 					"message": "margin claculation wrong",
 					"nTotal": settings.data.length, 
@@ -359,8 +359,8 @@ export default function LazyTable(options) {
 	const init = function() {
 		// remove old event handlers
 		that.off('scroll');
-		that.off('tableWindow:focus');
-		that.off('tableWindow:resize');
+		that.off('lazytable:focus');
+		that.off('lazytable:resize');
 		
 		// Temporarily setting the overflow property to 'hidden'
 		// during initialisation fixes a bug related to scrollTop 
@@ -383,16 +383,14 @@ export default function LazyTable(options) {
 			that.on('scroll', function() {
 				update();
 			});
-			//(that[0]).addEventListener('scroll', update, {passive: true});
-			//(that[0]).addEventListener('touchmove', update, {passive: true});
-			that.on('tableWindow:focus', function(event, index, callback) {
+			that.on('lazytable:focus', function(event, index, callback) {
 				focus(index).done(function() {
 					if(typeof(callback) === 'function') {
 						callback();
 					}
 				});
 			});
-			that.on('tableWindow:resize', function() {
+			that.on('lazytable:resize', function() {
 				if(!resizeAnimationWorking) {
 					resizeAnimationWorking = true;
 					resize().then(update).always(function() {

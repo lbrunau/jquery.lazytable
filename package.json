@@ -10,14 +10,15 @@
     "url": "https://github.com/lbrunau/jquery.lazytable"
   },
   "scripts": {
+    "start": "webpack-serve --config webpack.dev.js",
     "build": "webpack --mode development --config webpack.dev.js",
     "deploy": "webpack --mode production --config webpack.prod.js"
   },
   "devDependencies": {
     "babel-preset-env": "^1.6.1",
-    "uglifyjs-webpack-plugin": "^1.2.2",
     "webpack": "^4.0.1",
     "webpack-cli": "^2.0.9",
-    "webpack-merge": "^4.1.2"
+    "webpack-merge": "^4.1.2",
+    "webpack-serve": "^0.2.0"
   }
 }
