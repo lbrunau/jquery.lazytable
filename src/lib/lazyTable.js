@@ -35,6 +35,7 @@ export default function LazyTable(options) {
 	var workingDown = settings.startIndex;
 	var resizeAnimationWorking = false;
 	var focusedIndex = false;
+	var reset = false;
 
 	const waitForRow = function() {
 		return new Promise((resolve, reject) => {
@@ -159,38 +160,34 @@ export default function LazyTable(options) {
 		};
 
 		if(targetWindow.top > currentWindow.bottom || targetWindow.bottom < currentWindow.top) {
-			console.log('RESET');
-			animations.push(restart(targetWindow.center));
+			if(!reset) {
+				reset = true;
+				animations.push(restart(targetWindow.center).then(() => reset = false).then(update));				
+			}
 		} else {
 			if(targetWindow.bottom >= currentWindow.bottom) {
-				console.log('ENQUEUE BOTTOM: ' + (targetWindow.bottom - currentWindow.bottom + 1));
 				animations.push(build(
 						() => nextIter.next(),
-						() => nextIter.hasNext() && nextIter.getCurrent() <= targetWindow.bottom,
+						() => !reset && nextIter.hasNext() && nextIter.getCurrent() <= targetWindow.bottom,
 						html => {
-							//if(html.length > 0) {
-								settings.appendFn(html);
-								table.css({'margin-bottom': (settings.data.length - nextIter.getCurrent()) * settings.trHeight});
-								if(settings.debug) {
-									console.log('[jQuery.Lazytable] bot +' + html.length + ' rows');
-								}								
-							//}
+							settings.appendFn(html);
+							table.css({'margin-bottom': (settings.data.length - nextIter.getCurrent()) * settings.trHeight});
+							if(settings.debug) {
+								console.log('[jQuery.Lazytable] bot +' + html.length + ' rows');
+							}								
 						})
 				);
 			}
 			if(targetWindow.top < currentWindow.top) {
-				console.log('ENQUEUE TOP: ' + (currentWindow.top - targetWindow.top));
 				animations.push(build(
 						() => prevIter.prev(),
-						() => prevIter.hasPrev() && prevIter.getCurrent() > targetWindow.top,
+						() => !reset && prevIter.hasPrev() && prevIter.getCurrent() > targetWindow.top,
 						html => {
-							//if(html.length > 0) {
-								settings.prependFn(html.reverse());
-								table.css({'margin-top': prevIter.getCurrent() * settings.trHeight});
-								if(settings.debug) {
-									console.log('[jQuery.Lazytable] top +' + html.length + ' rows');
-								}								
-							//}
+							settings.prependFn(html.reverse());
+							table.css({'margin-top': prevIter.getCurrent() * settings.trHeight});
+							if(settings.debug) {
+								console.log('[jQuery.Lazytable] top +' + html.length + ' rows');
+							}								
 						})
 				);				
 			}

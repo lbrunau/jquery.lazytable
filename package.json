@@ -11,10 +11,11 @@
   },
   "scripts": {
     "start": "webpack-serve --config webpack.dev.js",
-    "build": "webpack--config webpack.dev.js",
+    "build": "webpack --config webpack.dev.js",
     "deploy": "webpack --config webpack.prod.js"
   },
   "devDependencies": {
+    "babel-polyfill": "^6.26.0",
     "babel-preset-env": "^1.6.1",
     "webpack": "^4.0.1",
     "webpack-cli": "^2.0.9",
