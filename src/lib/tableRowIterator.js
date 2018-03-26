@@ -1,3 +1,8 @@
+/**
+ * This object will act as a seekable iterator over a dataset.
+ * It uses a generatorFunction that processes each row before it
+ * is delivered to the caller.
+ */
 export default function TableRowIterator(generatorFunction, rows) {
 	this.generatorFunction = generatorFunction;
 	this.rows = rows;

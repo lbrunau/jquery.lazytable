@@ -1,10 +1,17 @@
 import TableRowIterator from "./tableRowIterator.js";
 
 export default function LazyTable(options) {
+	/*
+	 * Relevant DOM objects.
+	 */
 	const that = this;
 	const table = this.find('table');
 	const tableBody = this.find('table tbody');
 
+	
+	/*
+	 * Init settings.
+	 */
 	const defaults = {
 			debug: false,         // output console logs
 			trHeight: 0,          // height of a single row - set to 0 for automatic determination
@@ -28,15 +35,28 @@ export default function LazyTable(options) {
 	};
 	const settings = $.extend({}, defaults, options);
 	
-	var nextIter = new TableRowIterator(settings.generator, settings.data);
+	
+	/*
+	 * Init plugin-global variables.
+	 */
+	/* Seekable Iterators over data */
+	const nextIter = new TableRowIterator(settings.generator, settings.data);
 	nextIter.setCurrent(settings.startIndex);
-	var prevIter = nextIter.clone();
-	var workingUp = settings.startIndex;
-	var workingDown = settings.startIndex;
+	const prevIter = nextIter.clone();
+	
+	/* Flag to indicate that a resize event is being worked on already. */
 	var resizeAnimationWorking = false;
+	
+	/* The currently focused index - to be refocused on resize. */
 	var focusedIndex = false;
+	
+	/* Flag to indicate a table reset (restart). */
 	var reset = false;
 
+	
+	/*
+	 * Wait until at least one row is being drawn.
+	 */
 	const waitForRow = function() {
 		return new Promise((resolve, reject) => {
 			var tries = 1;
@@ -56,22 +76,38 @@ export default function LazyTable(options) {
 		});
 	};
 
+	
+	/*
+	 * Create a build animation promise. This animation turns data rows into
+	 * DOM Table rows that are appended.
+	 */
 	const build = function(getFn, testFn, appendFn) {
 		return new Promise((resolve, reject) => {
+			/*
+			 * Only draw a small number of rows to prevent the user interface
+			 * from hanging. If the total animation covers a large number of rows
+			 * it is spread across several animation frames.
+			 */
 			const anim = function(taskStartTime) {
-				const html = [];
+				var html = [];
 				
+				// spend settings.animationCalcTime for generating rows
 				while(testFn() && (window.performance.now() - taskStartTime < settings.animationCalcTime)) {
 					html.push(getFn());
 				}
 				
+				// append generated rows - this will require additional time 
+				// for rendering and painting (so keep animationCalcTime below
+				// 16ms)
 				if(html.length > 0) {
 					appendFn(html);
 				}
 				
 				if(testFn()) {
+					// continue animation in next frame
 					window.requestAnimationFrame(anim);
 				} else {
+					// animation done
 					resolve(html);
 				}
 			};
@@ -80,6 +116,11 @@ export default function LazyTable(options) {
 		});
 	};
 
+	
+	/*
+	 * Free any rendered rows that are no longer needed. Only relevant
+	 * if settings.keepExisting = false
+	 */
 	const free = function() {
 		const currentWindow = calcCurrentWindow();
 		const targetWindow = calcTargetWindow();
@@ -102,6 +143,7 @@ export default function LazyTable(options) {
 		}
 	};
 
+	
 	/*
 	 * Get the desired window based on current scroll position.
 	 */
@@ -116,6 +158,7 @@ export default function LazyTable(options) {
 		return w;
 	};
 	
+	
 	/* 
 	 * Get the currently drawn window.
 	 */
@@ -129,12 +172,56 @@ export default function LazyTable(options) {
 		return w;
 	};
 	
+	
+	/*
+	 * Update the set of rendered rows based on the current scroll position.
+	 * This function should be called every time the scroll position changes.
+	 */
 	const update = function() {
 		const targetWindow = calcTargetWindow();
 		const currentWindow = calcCurrentWindow();
 
 		var animations = [];
-		const finalizeRedraw = function() {
+		
+		if(targetWindow.top > currentWindow.bottom || targetWindow.bottom < currentWindow.top) {
+			// targetWindow does not intersect with currentWindow
+			// -> restart at targetWindow's center
+			if(!reset) {
+				reset = true;
+				animations.push(restart(targetWindow.center).then(() => reset = false).then(update));				
+			}
+		} else {
+			if(targetWindow.bottom >= currentWindow.bottom) {
+				// more rows at the bottom of the table are needed
+				animations.push(build(
+						() => nextIter.next(),
+						() => !reset && nextIter.hasNext() && nextIter.getCurrent() <= targetWindow.bottom,
+						html => {
+							settings.appendFn(html);
+							table.css({'margin-bottom': (settings.data.length - nextIter.getCurrent()) * settings.trHeight});
+							if(settings.debug) {
+								console.log('[jQuery.Lazytable] bot +' + html.length + ' rows');
+							}								
+						})
+				);
+			}
+			if(targetWindow.top < currentWindow.top) {
+				// more rows at the top of the table are needed
+				animations.push(build(
+						() => prevIter.prev(),
+						() => !reset && prevIter.hasPrev() && prevIter.getCurrent() > targetWindow.top,
+						html => {
+							settings.prependFn(html.reverse());
+							table.css({'margin-top': prevIter.getCurrent() * settings.trHeight});
+							if(settings.debug) {
+								console.log('[jQuery.Lazytable] top +' + html.length + ' rows');
+							}								
+						})
+				);				
+			}
+		}
+		
+		return Promise.all(animations).then(() => {
 			if(!settings.keepExisting) {
 				free();
 			}
@@ -156,47 +243,14 @@ export default function LazyTable(options) {
 			}
 			if(typeof(settings.onRedraw) === 'function') {
 				settings.onRedraw();
-			}
-		};
-
-		if(targetWindow.top > currentWindow.bottom || targetWindow.bottom < currentWindow.top) {
-			if(!reset) {
-				reset = true;
-				animations.push(restart(targetWindow.center).then(() => reset = false).then(update));				
-			}
-		} else {
-			if(targetWindow.bottom >= currentWindow.bottom) {
-				animations.push(build(
-						() => nextIter.next(),
-						() => !reset && nextIter.hasNext() && nextIter.getCurrent() <= targetWindow.bottom,
-						html => {
-							settings.appendFn(html);
-							table.css({'margin-bottom': (settings.data.length - nextIter.getCurrent()) * settings.trHeight});
-							if(settings.debug) {
-								console.log('[jQuery.Lazytable] bot +' + html.length + ' rows');
-							}								
-						})
-				);
-			}
-			if(targetWindow.top < currentWindow.top) {
-				animations.push(build(
-						() => prevIter.prev(),
-						() => !reset && prevIter.hasPrev() && prevIter.getCurrent() > targetWindow.top,
-						html => {
-							settings.prependFn(html.reverse());
-							table.css({'margin-top': prevIter.getCurrent() * settings.trHeight});
-							if(settings.debug) {
-								console.log('[jQuery.Lazytable] top +' + html.length + ' rows');
-							}								
-						})
-				);				
-			}
-		}
-		
-		return Promise.all(animations).then(finalizeRedraw);
+			}			
+		});
 	};
 	
-	/* Move index to center of window, if possible. */
+	
+	/* 
+	 * Move a certain index to center of window, if possible. 
+	 */
 	const center = function(index) {
 		return new Promise((resolve, reject) => {
 			const top = Math.min(
@@ -208,6 +262,12 @@ export default function LazyTable(options) {
 		});
 	};
 	
+	
+	/*
+	 * Focus an index - move it to the visible part of the window.
+	 * If index is outside the current window, the table will be
+	 * rebuilt with index being centered.
+	 */
 	const focus = function(index) {
 		const currentWindow = calcCurrentWindow();
 		focusedIndex = index;
@@ -245,12 +305,22 @@ export default function LazyTable(options) {
 		return restart(index);
 	};
 	
+	
+	/*
+	 * Restart table drawing at a given index.
+	 * The index will be centered.
+	 */
 	const restart = function(index) {
 		return start(index, false).then(function() {
 			return center(index);
 		}).then(update);
 	};
 	
+	
+	/*
+	 * Draw the first row in the table. settings.trHeight will be calculated 
+	 * if desired and necessary.
+	 */
 	const start = function(index, calcTrHeight) {
 		return new Promise((resolve, reject) => {
 			const finalize = function() {
@@ -303,6 +373,10 @@ export default function LazyTable(options) {
 		});
 	};
 	
+	
+	/*
+	 * Restore table after table window div has been resized.
+	 */
 	const resize = function() {
 		return waitForRow().then(row => {
 			const cssHeight = window.getComputedStyle(row).getPropertyValue('height');
@@ -326,6 +400,10 @@ export default function LazyTable(options) {
 		});
 	};
 	
+	
+	/*
+	 * Start all up.
+	 */
 	const init = function() {
 		// remove old event handlers
 		that.off('scroll');
