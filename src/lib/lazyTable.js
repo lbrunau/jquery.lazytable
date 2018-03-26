@@ -55,13 +55,17 @@ export default function LazyTable(options) {
 		});
 	};
 
-	const build = function(getFn, testFn) {
+	const build = function(getFn, testFn, appendFn) {
 		return new Promise((resolve, reject) => {
 			const anim = function(taskStartTime) {
 				const html = [];
 				
 				while(testFn() && (window.performance.now() - taskStartTime < settings.animationCalcTime)) {
 					html.push(getFn());
+				}
+				
+				if(html.length > 0) {
+					appendFn(html);
 				}
 				
 				if(testFn()) {
@@ -162,15 +166,15 @@ export default function LazyTable(options) {
 				console.log('ENQUEUE BOTTOM: ' + (targetWindow.bottom - currentWindow.bottom + 1));
 				animations.push(build(
 						() => nextIter.next(),
-						() => nextIter.hasNext() && nextIter.getCurrent() <= targetWindow.bottom
-						).then(html => {
-							if(html.length > 0) {
+						() => nextIter.hasNext() && nextIter.getCurrent() <= targetWindow.bottom,
+						html => {
+							//if(html.length > 0) {
 								settings.appendFn(html);
 								table.css({'margin-bottom': (settings.data.length - nextIter.getCurrent()) * settings.trHeight});
 								if(settings.debug) {
 									console.log('[jQuery.Lazytable] bot +' + html.length + ' rows');
 								}								
-							}
+							//}
 						})
 				);
 			}
@@ -178,15 +182,15 @@ export default function LazyTable(options) {
 				console.log('ENQUEUE TOP: ' + (currentWindow.top - targetWindow.top));
 				animations.push(build(
 						() => prevIter.prev(),
-						() => prevIter.hasPrev() && prevIter.getCurrent() > targetWindow.top
-						).then(html => {
-							if(html.length > 0) {
+						() => prevIter.hasPrev() && prevIter.getCurrent() > targetWindow.top,
+						html => {
+							//if(html.length > 0) {
 								settings.prependFn(html.reverse());
 								table.css({'margin-top': prevIter.getCurrent() * settings.trHeight});
 								if(settings.debug) {
 									console.log('[jQuery.Lazytable] top +' + html.length + ' rows');
 								}								
-							}
+							//}
 						})
 				);				
 			}
