@@ -6,6 +6,7 @@ module.exports = merge(common, {
   output: {
     filename: '[name].min.js'
   },
+  mode: 'production',
   plugins: [
     new webpack.DefinePlugin({
       'process.env.NODE_ENV': JSON.stringify('production')

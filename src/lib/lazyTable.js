@@ -14,17 +14,14 @@ export default function LazyTable(options) {
 			keepExisting: true,   // if true, rows will not be deleted when getting out of visible area 
 			prefetch: 0,          // number of rows by which to extend visible area
 			animationCalcTime: 3, // milliseconds
-			appendFn: function(rows) { 
+			appendFn: function(rows) {
 				tableBody.append(rows.join()); 
-				return $.Deferred().resolve().promise(); 
 			},
 			prependFn: function(rows) { 
 				tableBody.prepend(rows.join()); 
-				return $.Deferred().resolve().promise(); 
 			},
 			deleteFn: function(startIndex, endIndex) { 
 				tableBody.children().slice(startIndex, endIndex).remove();
-				return $.Deferred().resolve().promise();
 			},
 			onInit: null,         // callback function - will be called after initialization has finished
 			onRedraw: null        // callback function - will be called after rows have been added or removed
@@ -36,107 +33,66 @@ export default function LazyTable(options) {
 	var prevIter = nextIter.clone();
 	var workingUp = settings.startIndex;
 	var workingDown = settings.startIndex;
-	var upAnimationWorking = false;
-	var downAnimationWorking = false;
 	var resizeAnimationWorking = false;
 	var focusedIndex = false;
 
 	const waitForRow = function() {
-		var tries = 1;
-		const rowDeferred = $.Deferred();
-		const wait = function() {
-			const rows = tableBody.children();
-			if(rows.length > 0) {
-				// wait one frame before resolving
-				window.setTimeout(function() { rowDeferred.resolve(rows.get(0)); }, 16);
-			} else if(tries++ < 10){
-				// retry
-				window.setTimeout(wait, 100);
-			} else {
-				rowDeferred.reject();
-			}
-		};
-		wait();
-		return rowDeferred.promise();
+		return new Promise((resolve, reject) => {
+			var tries = 1;
+			const wait = function() {
+				const rows = tableBody.children();
+				if(rows.length > 0) {
+					// wait one frame before resolving
+					window.setTimeout(function() { resolve(rows.get(0)); }, 16);
+				} else if(tries++ < 10){
+					// retry
+					window.setTimeout(wait, 100);
+				} else {
+					reject();
+				}
+			};
+			wait();
+		});
 	};
 
-	
-	const buildDown = function() {
-		const deferred = $.Deferred();
-		const anim = function(taskStartTime) {
-			var html = [];
-			var n = 0;
-
-			while(nextIter.hasNext() && (nextIter.getCurrent() <= workingDown) && (window.performance.now() - taskStartTime < settings.animationCalcTime)) {
-				html.push(nextIter.next());
-				n++;
-			}
-			if(html.length > 0) {
-				settings.appendFn(html);
-				table.css({'margin-bottom': (settings.data.length - nextIter.getCurrent()) * settings.trHeight});
-			}
-			if(settings.debug) {
-				console.log('[jQuery.Lazytable] bot +' + n + ' rows');					
-			}
-			if(nextIter.getCurrent() <= workingDown) {
-				window.requestAnimationFrame(anim);
-			} else {
-				deferred.resolve();
-			}
-		};
-		window.requestAnimationFrame(anim);
-		return deferred.promise();
-	};
-	
-	const buildUp = function() {
-		const deferred = $.Deferred();
-		const anim = function(taskStartTime) {
-			var html = [];
-			var n = 0;
-			while(prevIter.hasPrev() && (prevIter.getCurrent() > workingUp) && (window.performance.now() - taskStartTime < settings.animationCalcTime)) {
-				html.unshift(prevIter.prev());
-				n++;
-			}
-			if(html.length > 0) {
-				settings.prependFn(html);
-				table.css({'margin-top': prevIter.getCurrent() * settings.trHeight});
-			}
-
-			if(settings.debug) {
-				console.log('[jQuery.Lazytable] top +' + n + ' rows');					
-			}
-			if(prevIter.getCurrent() > workingUp) {
-				window.requestAnimationFrame(anim);
-			} else {
-				deferred.resolve();
-			}
-		};
-		window.requestAnimationFrame(anim);
-		return deferred.promise();
-	};
-	
-	const free = function() {
-		const scrollTop = that.scrollTop();
-		const start = prevIter.getCurrent();
-		const end = nextIter.getCurrent();
-		
-		const cleaningUp = Math.min(Math.ceil((scrollTop + that.innerHeight())/ settings.trHeight) + settings.prefetch, settings.data.length);
-		const cleaningDown = Math.max(Math.floor(scrollTop / settings.trHeight) - settings.prefetch, 0);
+	const build = function(getFn, testFn) {
+		return new Promise((resolve, reject) => {
+			const anim = function(taskStartTime) {
+				const html = [];
 				
-		if(!downAnimationWorking && cleaningUp < end) {
-			nextIter.setCurrent(cleaningUp);
-			settings.deleteFn(cleaningUp - end); // index will be negative - so removed from the end of the list
-			table.css({'margin-bottom': (settings.data.length - cleaningUp) * settings.trHeight});
+				while(testFn() && (window.performance.now() - taskStartTime < settings.animationCalcTime)) {
+					html.push(getFn());
+				}
+				
+				if(testFn()) {
+					window.requestAnimationFrame(anim);
+				} else {
+					resolve(html);
+				}
+			};
+			
+			window.requestAnimationFrame(anim);			
+		});
+	};
+
+	const free = function() {
+		const currentWindow = calcCurrentWindow();
+		const targetWindow = calcTargetWindow();
+		
+		if(targetWindow.bottom < currentWindow.bottom) {
+			nextIter.setCurrent(targetWindow.bottom);
+			settings.deleteFn(targetWindow.bottom - currentWindow.bottom); // index will be negative - so removed from the end of the list
+			table.css({'margin-bottom': (settings.data.length - targetWindow.bottom) * settings.trHeight});
 			if(settings.debug) {
-				console.log('[jQuery.Lazytable] bot -' + (end - cleaningUp) + ' rows');					
-			}
+				console.log('[jQuery.Lazytable] bot -' + (currentWindow.bottom - targetWindow.bottom) + ' rows');					
+			}			
 		}
-		if(!upAnimationWorking && cleaningDown > start) {
-			prevIter.setCurrent(cleaningDown);
-			settings.deleteFn(0, cleaningDown - start);
-			table.css({'margin-top': cleaningDown * settings.trHeight});
+		if(targetWindow.top > currentWindow.top) {
+			prevIter.setCurrent(targetWindow.top);
+			settings.deleteFn(0, targetWindow.top - currentWindow.top);
+			table.css({'margin-top': targetWindow.top * settings.trHeight});
 			if(settings.debug) {
-				console.log('[jQuery.Lazytable] top -' + (cleaningDown - start) + ' rows');					
+				console.log('[jQuery.Lazytable] top -' + (targetWindow.top - currentWindow.top) + ' rows');					
 			}
 		}
 	};
@@ -150,7 +106,7 @@ export default function LazyTable(options) {
 			top: Math.max(Math.floor(scrollTop / settings.trHeight) - settings.prefetch, 0),
 			bottom: Math.min(Math.ceil((scrollTop + that.innerHeight()) / settings.trHeight) + settings.prefetch, settings.data.length - 1)
 		};
-		w.center = Math.min(Math.floor(w.bottom + w.top / 2), settings.data.length - 1);
+		w.center = Math.min(Math.floor((w.bottom + w.top) / 2), settings.data.length - 1);
 		
 		return w;
 	};
@@ -163,7 +119,7 @@ export default function LazyTable(options) {
 			top: prevIter.getCurrent(),
 			bottom: nextIter.getCurrent()
 		};
-		w.center = Math.min(Math.floor(w.bottom + w.top / 2), settings.data.length - 1);
+		w.center = Math.min(Math.floor((w.bottom + w.top) / 2), settings.data.length - 1);
 		
 		return w;
 	};
@@ -171,7 +127,8 @@ export default function LazyTable(options) {
 	const update = function() {
 		const targetWindow = calcTargetWindow();
 		const currentWindow = calcCurrentWindow();
-		
+
+		var animations = [];
 		const finalizeRedraw = function() {
 			if(!settings.keepExisting) {
 				free();
@@ -197,49 +154,57 @@ export default function LazyTable(options) {
 			}
 		};
 
-		workingDown = targetWindow.bottom;
-		workingUp = targetWindow.top;
-		
-		var animations = [];
-		
-		// only start animation if it is not currently active
-		if(!downAnimationWorking && targetWindow.bottom >= currentWindow.bottom) {
-			var downDeferred = $.Deferred();
-			downAnimationWorking = true;
-			buildDown().done(function() {
-				finalizeRedraw();
-				downAnimationWorking = false;
-				downDeferred.resolve();
-			});
-			animations.push(downDeferred);
+		if(targetWindow.top > currentWindow.bottom || targetWindow.bottom < currentWindow.top) {
+			console.log('RESET');
+			animations.push(restart(targetWindow.center));
+		} else {
+			if(targetWindow.bottom >= currentWindow.bottom) {
+				console.log('ENQUEUE BOTTOM: ' + (targetWindow.bottom - currentWindow.bottom + 1));
+				animations.push(build(
+						() => nextIter.next(),
+						() => nextIter.hasNext() && nextIter.getCurrent() <= targetWindow.bottom
+						).then(html => {
+							if(html.length > 0) {
+								settings.appendFn(html);
+								table.css({'margin-bottom': (settings.data.length - nextIter.getCurrent()) * settings.trHeight});
+								if(settings.debug) {
+									console.log('[jQuery.Lazytable] bot +' + html.length + ' rows');
+								}								
+							}
+						})
+				);
+			}
+			if(targetWindow.top < currentWindow.top) {
+				console.log('ENQUEUE TOP: ' + (currentWindow.top - targetWindow.top));
+				animations.push(build(
+						() => prevIter.prev(),
+						() => prevIter.hasPrev() && prevIter.getCurrent() > targetWindow.top
+						).then(html => {
+							if(html.length > 0) {
+								settings.prependFn(html.reverse());
+								table.css({'margin-top': prevIter.getCurrent() * settings.trHeight});
+								if(settings.debug) {
+									console.log('[jQuery.Lazytable] top +' + html.length + ' rows');
+								}								
+							}
+						})
+				);				
+			}
 		}
 		
-		if(!upAnimationWorking && targetWindow.top < currentWindow.top) {
-			var upDeferred = $.Deferred();
-			upAnimationWorking = true;
-			buildUp().done(function() {
-				finalizeRedraw();
-				upAnimationWorking = false;
-				upDeferred.resolve();
-			});
-			animations.push(upDeferred);
-		} 
-		
-		return $.when(animations).then(finalizeRedraw);
+		return Promise.all(animations).then(finalizeRedraw);
 	};
 	
 	/* Move index to center of window, if possible. */
 	const center = function(index) {
-		const centerDeferred = $.Deferred();
-		
-		const top = Math.min(
-				Math.max(index * settings.trHeight - (that.innerHeight() - settings.trHeight)/2, 0),
-				that.prop('scrollHeight')
-		);
-		that.scrollTop(top);
-		window.setTimeout(function() { centerDeferred.resolve(); }, 16);
-		
-		return centerDeferred.promise();
+		return new Promise((resolve, reject) => {
+			const top = Math.min(
+					Math.max(index * settings.trHeight - (that.innerHeight() - settings.trHeight)/2, 0),
+					that.prop('scrollHeight')
+			);
+			that.scrollTop(top);
+			window.setTimeout(resolve, 16);			
+		});
 	};
 	
 	const focus = function(index) {
@@ -247,30 +212,29 @@ export default function LazyTable(options) {
 		focusedIndex = index;
 		
 		if(currentWindow.top <= index && index < currentWindow.bottom) {
-			const focusDeferred = $.Deferred();
-			
-			/*
-			 * If the desired index is within the currently active area,
-			 * the table window will scroll until the desired index reaches
-			 * the window's visible area.
-			 */
-			const offset = index * settings.trHeight;
-			const windowTop = that.scrollTop();
-			const windowHeight = that.innerHeight();
+			return new Promise((resolve, reject) => {
+				/*
+				 * If the desired index is within the currently active area,
+				 * the table window will scroll until the desired index reaches
+				 * the window's visible area.
+				 */
+				const offset = index * settings.trHeight;
+				const windowTop = that.scrollTop();
+				const windowHeight = that.innerHeight();
 
-			// Do not center index, as it is already within current viewport.
-			// Only adjust position, if it is only partly visible.
-			var scrollTop = -1;
-			if(offset + settings.trHeight > windowTop + windowHeight) {
-				scrollTop = Math.max(0, offset - (windowHeight - settings.trHeight));
-			} else if(offset < windowTop ) {
-				scrollTop = offset;
-			}
-			if(scrollTop >= 0) {
-				that.scrollTop(scrollTop);	
-			}
-			window.setTimeout(function() { focusDeferred.resolve(); }, 16);
-			return focusDeferred.promise();
+				// Do not center index, as it is already within current viewport.
+				// Only adjust position, if it is only partly visible.
+				var scrollTop = -1;
+				if(offset + settings.trHeight > windowTop + windowHeight) {
+					scrollTop = Math.max(0, offset - (windowHeight - settings.trHeight));
+				} else if(offset < windowTop ) {
+					scrollTop = offset;
+				}
+				if(scrollTop >= 0) {
+					that.scrollTop(scrollTop);	
+				}
+				window.setTimeout(resolve, 16);				
+			});
 		}
 
 		/*
@@ -287,31 +251,30 @@ export default function LazyTable(options) {
 	};
 	
 	const start = function(index, calcTrHeight) {
-		const startDeferred = $.Deferred();
-		
-		const finalize = function() {
-			const paddingTop = index * settings.trHeight;
-			const height = settings.trHeight * settings.data.length;
-			const paddingBottom = height - paddingTop - settings.trHeight;
-		
-			table.css({
-				'margin-bottom': paddingBottom,
-				'margin-top': paddingTop,
-			});
+		return new Promise((resolve, reject) => {
+			const finalize = function() {
+				const paddingTop = index * settings.trHeight;
+				const height = settings.trHeight * settings.data.length;
+				const paddingBottom = height - paddingTop - settings.trHeight;
 			
-			startDeferred.resolve();
-		};
-		
-		// remove all table elements
-		settings.deleteFn(0);
-		
-		// start at element to be focused
-		nextIter.setCurrent(index);
-		prevIter.setCurrent(index);
-		
-		// insert new row
-		if(nextIter.hasNext()) {
-			settings.appendFn([nextIter.next()]).then(function() {
+				table.css({
+					'margin-bottom': paddingBottom,
+					'margin-top': paddingTop,
+				});
+				
+				resolve();
+			};
+			
+			// remove all table elements
+			settings.deleteFn(0);
+			
+			// start at element to be focused
+			nextIter.setCurrent(index);
+			prevIter.setCurrent(index);
+			
+			// insert new row
+			if(nextIter.hasNext()) {
+				settings.appendFn([nextIter.next()]);
 				if(calcTrHeight) {
 					/*
 					 * Height calculation: After insterting the first row,
@@ -319,7 +282,7 @@ export default function LazyTable(options) {
 					 * use the first row's height to calculate margins.
 					 */
 			
-					waitForRow().done(function(row) {
+					waitForRow().then(function(row) {
 						const cs = window.getComputedStyle(row);
 						const cssHeight = cs.getPropertyValue('height');
 						const matches = cssHeight.match(/([\.\d]+)px/);
@@ -329,22 +292,18 @@ export default function LazyTable(options) {
 						} else {
 							settings.trHeight = row.offsetHeight;
 						}
-					}).always(finalize);
+					}).then(finalize);
 				} else {
 					finalize();
 				}
-			});
-		} else {
-			finalize();
-		}
-
-		return startDeferred.promise();
+			} else {
+				finalize();
+			}			
+		});
 	};
 	
 	const resize = function() {
-		const resizeDeferred = $.Deferred();
-		
-		waitForRow().done(function(row) {
+		return waitForRow().then(row => {
 			const cssHeight = window.getComputedStyle(row).getPropertyValue('height');
 			var matches;
 			const height = (matches = cssHeight.match(/([\.\d]+)px/)) ? parseFloat(matches[1]) : row.offsetHeight;
@@ -362,11 +321,8 @@ export default function LazyTable(options) {
 				// height has not changed, but focuse row 
 				// might have gone out of visible area
 				return focus(focusedIndex);
-			}
-			// else: nothing to do
+			}			
 		});
-		
-		return resizeDeferred.promise();
 	};
 	
 	const init = function() {
@@ -384,7 +340,7 @@ export default function LazyTable(options) {
 		start(settings.startIndex, true).then(function() {
 			focusedIndex = settings.startIndex;
 			return center(settings.startIndex);
-		}).then(update).always(function() {
+		}).then(update).then(function() {
 			// reset overflow to 'scroll'
 			that.css({'overflow-y': 'scroll'});
 
@@ -397,7 +353,7 @@ export default function LazyTable(options) {
 				update();
 			});
 			that.on('lazytable:focus', function(event, index, callback) {
-				focus(index).done(function() {
+				focus(index).then(function() {
 					if(typeof(callback) === 'function') {
 						callback();
 					}
@@ -406,7 +362,7 @@ export default function LazyTable(options) {
 			that.on('lazytable:resize', function() {
 				if(!resizeAnimationWorking) {
 					resizeAnimationWorking = true;
-					resize().then(update).always(function() {
+					resize().then(update).finally(function() {
 						resizeAnimationWorking = false;
 					});
 				}

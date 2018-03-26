@@ -11,8 +11,8 @@
   },
   "scripts": {
     "start": "webpack-serve --config webpack.dev.js",
-    "build": "webpack --mode development --config webpack.dev.js",
-    "deploy": "webpack --mode production --config webpack.prod.js"
+    "build": "webpack--config webpack.dev.js",
+    "deploy": "webpack --config webpack.prod.js"
   },
   "devDependencies": {
     "babel-preset-env": "^1.6.1",
