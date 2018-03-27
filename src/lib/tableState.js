@@ -9,10 +9,9 @@ export const TableState = {
 export const TableAction = {
 	START:           1,
 	START_COMPLETE:  2,
-	FOCUS:           3,
+	RESTART:         3,
 	SCROLL:          4,
-	SCROLL_COMPLETE: 5,
-	RESTART:         6
+	SCROLL_COMPLETE: 5
 };
 
 class StateMachine {
@@ -95,16 +94,16 @@ export class TableStateMachine extends StateMachine {
 		this._addTransition(TableState.EMPTY, TableAction.START, TableState.STARTING);
 		
 		this._addTransition(TableState.STARTING, TableAction.SCROLL, TableState.UPDATING);
-		this._addTransition(TableState.STARTING, TableAction.FOCUS, TableState.RESETTING);
+		this._addTransition(TableState.STARTING, TableAction.RESTART, TableState.RESETTING);
 		
 		this._addTransition(TableState.UPDATING, TableAction.SCROLL_COMPLETE, TableState.IDLE);
 		this._addTransition(TableState.UPDATING, TableAction.SCROLL, TableState.UPDATING);
-		this._addTransition(TableState.UPDATING, TableAction.FOCUS, TableState.RESETTING);
+		this._addTransition(TableState.UPDATING, TableAction.RESTART, TableState.RESETTING);
 		
 		this._addTransition(TableState.IDLE, TableAction.SCROLL, TableState.UPDATING);
-		this._addTransition(TableState.IDLE, TableAction.FOCUS, TableState.RESETTING);
+		this._addTransition(TableState.IDLE, TableAction.RESTART, TableState.RESETTING);
 		
-		this._addTransition(TableState.RESETTING, TableAction.FOCUS, TableState.RESETTING);
+		this._addTransition(TableState.RESETTING, TableAction.RESTART, TableState.RESETTING);
 		this._addTransition(TableState.RESETTING, TableAction.START, TableState.STARTING);
 	}
 };

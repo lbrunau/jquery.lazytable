@@ -94,7 +94,9 @@ export default function LazyTable(options) {
 				var html = [];
 				
 				// spend settings.animationCalcTime for generating rows
-				while(testFn(targetWindow) && (window.performance.now() - taskStartTime < settings.animationCalcTime)) {
+				while((stateMachine.getState() != TableState.RESETTING) 
+						&& testFn(targetWindow) 
+						&& (window.performance.now() - taskStartTime < settings.animationCalcTime)) {
 					html.push(getFn());
 				}
 				
@@ -186,9 +188,8 @@ export default function LazyTable(options) {
 		if(targetWindow.top > currentWindow.bottom || targetWindow.bottom < currentWindow.top) {
 			// targetWindow does not intersect with currentWindow
 			// -> restart at targetWindow's center
-			return stateMachine.trigger(TableAction.RESTART, () => {
-				return restart(targetWindow.center);
-			});
+			console.log('RESTART');
+			return stateMachine.trigger(TableAction.RESTART).then(restart(targetWindow.center));
 		}
 		
 		// else:
@@ -273,7 +274,7 @@ export default function LazyTable(options) {
 		 * Else: If desired index is not within currently active area,
 		 * the table will be rebuilt from scratch. 
 		 */
-		return stateMachine.trigger(TableAction.RESTART, () => {
+		return stateMachine.trigger(TableAction.RESTART).then(() => {
 			return restart(index);
 		});
 	};
