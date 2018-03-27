@@ -10,10 +10,8 @@ export const TableAction = {
 	'START': 0,          /* Draw first row */
 	'BUILD-START': 1,    /* Start drawing pending rows */
 	'BUILD-COMPLETE': 2, /* All drawings completed */
-	'NEAR-SCROLL': 3,    /* Scroll to a row within current window - possibly add further rows */
-	'WIDE-SCROLL': 4,    /* Scroll to a row outside of current window - restart */
-	'NEAR-FOCUS': 5,     /* Focus a row within the current window */
-	'WIDE-FOCUS': 6      /* Focus a row outside the current window */
+	'SCROLL': 3,    /* Scroll to a row within current window - possibly add further rows */
+	'RESET': 6      /* Focus a row outside the current window */
 };
 
 class StateMachine {
@@ -41,13 +39,23 @@ class StateMachine {
 	}
 	
 	trigger(action, promise) {
+		const that = this;
 		if(this.tranistions[this.state] && this.transitions[this.state][action]) {
-			if(typeof promise != 'undefined') {
-				promise.then(this._transitState(this.transitions[this.state][action]));
-			} else {
-				this._transitState(this.transitions[this.state][action])
-			}
+			return new Promise((resolve, reject) => {
+				const finalize = () => {
+					that._transitState(that.transitions[that.state][action]);
+					resolve();
+				};
+				if(typeof promise == 'function') {
+					promise().then(finalize);
+				} else {
+					finalize();
+				}			
+			});
 		}
+		// else:
+		console.error('Undefined state transition: {state: ' + this.state + ', action: ' + action + '}');
+		console.trace();
 	}
 	
 	getState() {
@@ -90,15 +98,13 @@ export class TableStateMachine extends StateMachine {
 		this._addTransition(TableState.STARTED, TableAction.FOCUS, TableState.RESETTING);
 		
 		this._addTransition(TableState.UPDATING, TableAction.BUILD-COMPLETE, TableState.IDLE);
-		this._addTransition(TableState.UPDATING, TableAction.BUILD-START, TableState.UPDATING);
+		this._addTransition(TableState.UPDATING, TableAction.SCROLL, TableState.UPDATING);
 		this._addTransition(TableState.UPDATING, TableAction.FOCUS, TableState.RESETTING);
 		
-		this._addTransition(TableState.IDLE, TableAction.BUILD-START, TableState.UPDATING);
+		this._addTransition(TableState.IDLE, TableAction.SCROLL, TableState.UPDATING);
 		this._addTransition(TableState.IDLE, TableAction.FOCUS, TableState.RESETTING);
 		
 		this._addTransition(TableState.RESETTING, TableAction.FOCUS, TableState.RESETTING);
 		this._addTransition(TableState.RESETTING, TableAction.START, TableState.STARTED);
-		
-		this.resetPromise = false;
 	}
 };

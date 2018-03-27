@@ -1,4 +1,5 @@
 import TableRowIterator from "./tableRowIterator.js";
+import {TableState, TableAction, TableStateMachine} from "./tableState.js";
 
 export default function LazyTable(options) {
 	/*
@@ -44,15 +45,14 @@ export default function LazyTable(options) {
 	nextIter.setCurrent(settings.startIndex);
 	const prevIter = nextIter.clone();
 	
+	const stateMachine = new TableStateMachine();
+	
 	/* Flag to indicate that a resize event is being worked on already. */
 	var resizeAnimationWorking = false;
 	
 	/* The currently focused index - to be refocused on resize. */
 	var focusedIndex = false;
 	
-	/* Flag to indicate a table reset (restart). */
-	var reset = false;
-
 	
 	/*
 	 * Wait until at least one row is being drawn.
@@ -89,10 +89,12 @@ export default function LazyTable(options) {
 			 * it is spread across several animation frames.
 			 */
 			const anim = function(taskStartTime) {
+				// targetWindow is calculated once per frame
+				const targetWindow = calcTargetWindow();
 				var html = [];
 				
 				// spend settings.animationCalcTime for generating rows
-				while(testFn() && (window.performance.now() - taskStartTime < settings.animationCalcTime)) {
+				while(testFn(targetWindow) && (window.performance.now() - taskStartTime < settings.animationCalcTime)) {
 					html.push(getFn());
 				}
 				
@@ -103,7 +105,7 @@ export default function LazyTable(options) {
 					appendFn(html);
 				}
 				
-				if(testFn()) {
+				if(testFn(targetWindow)) {
 					// continue animation in next frame
 					window.requestAnimationFrame(anim);
 				} else {
@@ -184,73 +186,69 @@ export default function LazyTable(options) {
 		if(targetWindow.top > currentWindow.bottom || targetWindow.bottom < currentWindow.top) {
 			// targetWindow does not intersect with currentWindow
 			// -> restart at targetWindow's center
-			stateMachine.trigger(tableAction.RESET, () => {
+			return stateMachine.trigger(TableAction.RESTART, () => {
 				return restart(targetWindow.center);
 			});
-			
-//			if(!reset) {
-//				reset = true;
-//				animations.push(restart(targetWindow.center).then(() => reset = false).then(update));				
-//			}
-		} else {
-			var animations = []
-			if(targetWindow.bottom >= currentWindow.bottom) {
-				// more rows at the bottom of the table are needed
-				animations.push(build(
-						() => nextIter.next(),
-						() => (stateMachine.getState() != TableState.RESETTING) && nextIter.hasNext() && nextIter.getCurrent() <= targetWindow.bottom,
-						html => {
-							settings.appendFn(html);
-							table.css({'margin-bottom': (settings.data.length - nextIter.getCurrent()) * settings.trHeight});
-							if(settings.debug) {
-								console.log('[jQuery.Lazytable] bot +' + html.length + ' rows');
-							}								
-						})
-				);
-			}
-			if(targetWindow.top < currentWindow.top) {
-				// more rows at the top of the table are needed
-				animations.push(build(
-						() => prevIter.prev(),
-						() => (stateMachine.getState() != TableState.RESETTING) && prevIter.hasPrev() && prevIter.getCurrent() > targetWindow.top,
-						html => {
-							settings.prependFn(html.reverse());
-							table.css({'margin-top': prevIter.getCurrent() * settings.trHeight});
-							if(settings.debug) {
-								console.log('[jQuery.Lazytable] top +' + html.length + ' rows');
-							}								
-						})
-				);				
-			}
-			
-			if(animations.length > 0) {
-				stateMachine.trigger(tableAction.SCROLL, () {
-					return Promise.all(animations).then(() => {
-						if(!settings.keepExisting) {
-							free();
-						}
+		}
+		
+		// else:
+		var animations = [];
+		if(targetWindow.bottom >= currentWindow.bottom) {
+			// more rows at the bottom of the table are needed
+			animations.push(build(
+					() => nextIter.next(),
+					(targetWindow) => (stateMachine.getState() == TableState.UPDATING) && nextIter.hasNext() && nextIter.getCurrent() <= targetWindow.bottom,
+					html => {
+						settings.appendFn(html);
+						table.css({'margin-bottom': (settings.data.length - nextIter.getCurrent()) * settings.trHeight});
 						if(settings.debug) {
-							const n = nextIter.getCurrent() - prevIter.getCurrent();
-							const marginTopStr = table.css('margin-top');
-							const marginTop = parseInt(marginTopStr.substr(0, marginTopStr.length - 2));
-							const marginBotStr = table.css('margin-bottom');
-							const marginBot = parseInt(marginBotStr.substr(0, marginBotStr.length - 2));
-							console.log('[jQuery.Lazytable] nVisible: ' + n);
-							console.assert(((marginTop + marginBot) == (settings.data.length - n) * settings.trHeight), {
-								"message": "margin claculation wrong",
-								"nTotal": settings.data.length, 
-								"nVisible": n,
-								"top": marginTop,
-								"bottom": marginBot,
-								"trHeight": settings.trHeight
-							});
-						}
-						if(typeof(settings.onRedraw) === 'function') {
-							settings.onRedraw();
-						}			
-					});					
-				});				
-			}
+							console.log('[jQuery.Lazytable] bot +' + html.length + ' rows');
+						}								
+					})
+			);
+		}
+		if(targetWindow.top < currentWindow.top) {
+			// more rows at the top of the table are needed
+			animations.push(build(
+					() => prevIter.prev(),
+					(targetWindow) => (stateMachine.getState() == TableState.UPDATING) && prevIter.hasPrev() && prevIter.getCurrent() > targetWindow.top,
+					html => {
+						settings.prependFn(html.reverse());
+						table.css({'margin-top': prevIter.getCurrent() * settings.trHeight});
+						if(settings.debug) {
+							console.log('[jQuery.Lazytable] top +' + html.length + ' rows');
+						}								
+					})
+			);				
+		}
+		
+		if(animations.length > 0) {
+			return stateMachine.trigger(TableAction.SCROLL, () => {
+				return Promise.all(animations).then(() => {
+					if(!settings.keepExisting) {
+						free();
+					}
+					if(settings.debug) {
+						const n = nextIter.getCurrent() - prevIter.getCurrent();
+						const marginTopStr = table.css('margin-top');
+						const marginTop = parseInt(marginTopStr.substr(0, marginTopStr.length - 2));
+						const marginBotStr = table.css('margin-bottom');
+						const marginBot = parseInt(marginBotStr.substr(0, marginBotStr.length - 2));
+						console.log('[jQuery.Lazytable] nVisible: ' + n);
+						console.assert(((marginTop + marginBot) == (settings.data.length - n) * settings.trHeight), {
+							"message": "margin claculation wrong",
+							"nTotal": settings.data.length, 
+							"nVisible": n,
+							"top": marginTop,
+							"bottom": marginBot,
+							"trHeight": settings.trHeight
+						});
+					}
+					if(typeof(settings.onRedraw) === 'function') {
+						settings.onRedraw();
+					}			
+				});					
+			});				
 		}
 	};
 	
@@ -280,7 +278,7 @@ export default function LazyTable(options) {
 		focusedIndex = index;
 		
 		if(currentWindow.top <= index && index < currentWindow.bottom) {
-			return stateMachine.trigger(tableAction.SCROLL, () => {
+			return stateMachine.trigger(TableAction.SCROLL, () => {
 				return scrollTo(index);
 			});
 		}
@@ -289,7 +287,7 @@ export default function LazyTable(options) {
 		 * Else: If desired index is not within currently active area,
 		 * the table will be rebuilt from scratch. 
 		 */
-		return stateMachine.trigger(tableAction.RESTART, () => {
+		return stateMachine.trigger(TableAction.RESTART, () => {
 			return restart(index);
 		});
 	};
@@ -341,54 +339,56 @@ export default function LazyTable(options) {
 	 * if desired and necessary.
 	 */
 	const start = function(index, calcTrHeight) {
-		return new Promise((resolve, reject) => {
-			const finalize = function() {
-				const paddingTop = index * settings.trHeight;
-				const height = settings.trHeight * settings.data.length;
-				const paddingBottom = height - paddingTop - settings.trHeight;
-			
-				table.css({
-					'margin-bottom': paddingBottom,
-					'margin-top': paddingTop,
-				});
+		return stateMachine.trigger(TableAction.START, () => {
+			return new Promise((resolve, reject) => {
+				const finalize = function() {
+					const paddingTop = index * settings.trHeight;
+					const height = settings.trHeight * settings.data.length;
+					const paddingBottom = height - paddingTop - settings.trHeight;
 				
-				resolve();
-			};
-			
-			// remove all table elements
-			settings.deleteFn(0);
-			
-			// start at element to be focused
-			nextIter.setCurrent(index);
-			prevIter.setCurrent(index);
-			
-			// insert new row
-			if(nextIter.hasNext()) {
-				settings.appendFn([nextIter.next()]);
-				if(calcTrHeight) {
-					/*
-					 * Height calculation: After insterting the first row,
-					 * we wait for it to get drawn. When it is ready, we
-					 * use the first row's height to calculate margins.
-					 */
-			
-					waitForRow().then(function(row) {
-						const cs = window.getComputedStyle(row);
-						const cssHeight = cs.getPropertyValue('height');
-						const matches = cssHeight.match(/([\.\d]+)px/);
+					table.css({
+						'margin-bottom': paddingBottom,
+						'margin-top': paddingTop,
+					});
+					
+					resolve();
+				};
 				
-						if(matches) {
-							settings.trHeight = parseFloat(matches[1]);
-						} else {
-							settings.trHeight = row.offsetHeight;
-						}
-					}).then(finalize);
+				// remove all table elements
+				settings.deleteFn(0);
+				
+				// start at element to be focused
+				nextIter.setCurrent(index);
+				prevIter.setCurrent(index);
+				
+				// insert new row
+				if(nextIter.hasNext()) {
+					settings.appendFn([nextIter.next()]);
+					if(calcTrHeight) {
+						/*
+						 * Height calculation: After insterting the first row,
+						 * we wait for it to get drawn. When it is ready, we
+						 * use the first row's height to calculate margins.
+						 */
+				
+						waitForRow().then(function(row) {
+							const cs = window.getComputedStyle(row);
+							const cssHeight = cs.getPropertyValue('height');
+							const matches = cssHeight.match(/([\.\d]+)px/);
+					
+							if(matches) {
+								settings.trHeight = parseFloat(matches[1]);
+							} else {
+								settings.trHeight = row.offsetHeight;
+							}
+						}).then(finalize);
+					} else {
+						finalize();
+					}
 				} else {
 					finalize();
-				}
-			} else {
-				finalize();
-			}			
+				}			
+			});			
 		});
 	};
 	
@@ -414,7 +414,7 @@ export default function LazyTable(options) {
 			if(focusedIndex) {
 				// height has not changed, but focuse row 
 				// might have gone out of visible area
-				return focus(focusedIndex);
+				return onFocus(focusedIndex);
 			}			
 		});
 	};
