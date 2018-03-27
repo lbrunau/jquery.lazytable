@@ -1,3 +1,22 @@
+/* ******************************************************************
+ * 
+ *                                     scroll
+ *                                     +----+
+ *                                     |    |
+ *          start             scroll   v    |  scroll-complete
+ * (EMPTY) ------> (STARTING) -----> (UPDATING) -------------> (IDLE)
+ *                   ^    |            |    ^                   |  |
+ *                   |    |            |    |       scroll      |  |
+ *                   |    |       reset|    +-------------------+  |
+ *                   |    |            |                           |
+ *                   |    |  reset     v               reset       |
+ *                   |    +--------> (RESETTING) <-----------------+
+ *                   |                 |
+ *                   +-----------------+
+ *                         start
+ *                         
+ * ******************************************************************
+ */
 export const TableState = {
 	EMPTY:     1, /* Empty table */
 	IDLE:      2, /* Table drawn - no drawings pending */
@@ -9,7 +28,7 @@ export const TableState = {
 export const TableAction = {
 	START:           1,
 	START_COMPLETE:  2,
-	RESTART:         3,
+	RESET:           3,
 	SCROLL:          4,
 	SCROLL_COMPLETE: 5
 };
@@ -94,16 +113,16 @@ export class TableStateMachine extends StateMachine {
 		this._addTransition(TableState.EMPTY, TableAction.START, TableState.STARTING);
 		
 		this._addTransition(TableState.STARTING, TableAction.SCROLL, TableState.UPDATING);
-		this._addTransition(TableState.STARTING, TableAction.RESTART, TableState.RESETTING);
+		this._addTransition(TableState.STARTING, TableAction.RESET, TableState.RESETTING);
 		
 		this._addTransition(TableState.UPDATING, TableAction.SCROLL_COMPLETE, TableState.IDLE);
 		this._addTransition(TableState.UPDATING, TableAction.SCROLL, TableState.UPDATING);
-		this._addTransition(TableState.UPDATING, TableAction.RESTART, TableState.RESETTING);
+		this._addTransition(TableState.UPDATING, TableAction.RESET, TableState.RESETTING);
 		
 		this._addTransition(TableState.IDLE, TableAction.SCROLL, TableState.UPDATING);
-		this._addTransition(TableState.IDLE, TableAction.RESTART, TableState.RESETTING);
+		this._addTransition(TableState.IDLE, TableAction.RESET, TableState.RESETTING);
 		
-		this._addTransition(TableState.RESETTING, TableAction.RESTART, TableState.RESETTING);
+		this._addTransition(TableState.RESETTING, TableAction.RESET, TableState.RESETTING);
 		this._addTransition(TableState.RESETTING, TableAction.START, TableState.STARTING);
 	}
 };

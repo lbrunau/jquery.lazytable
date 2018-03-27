@@ -188,8 +188,7 @@ export default function LazyTable(options) {
 		if(targetWindow.top > currentWindow.bottom || targetWindow.bottom < currentWindow.top) {
 			// targetWindow does not intersect with currentWindow
 			// -> restart at targetWindow's center
-			console.log('RESTART');
-			return stateMachine.trigger(TableAction.RESTART).then(restart(targetWindow.center));
+			return stateMachine.trigger(TableAction.RESET).then(restart(targetWindow.center));
 		}
 		
 		// else:
@@ -274,7 +273,7 @@ export default function LazyTable(options) {
 		 * Else: If desired index is not within currently active area,
 		 * the table will be rebuilt from scratch. 
 		 */
-		return stateMachine.trigger(TableAction.RESTART).then(() => {
+		return stateMachine.trigger(TableAction.RESET).then(() => {
 			return restart(index);
 		});
 	};
