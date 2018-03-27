@@ -1,22 +1,22 @@
 export const TableState = {
-	EMPTY: 0,    /* Empty table */
-	IDLE: 1,     /* Table drawn - no drawings pending */
-	STARTING: 2, /* First row is being drawn - other rows pending */
-	UPDATING: 3, /* Performing pending draws */
-	RESETTING: 4 /* Waiting for any drawing operations to be canceled */
+	EMPTY:     1, /* Empty table */
+	IDLE:      2, /* Table drawn - no drawings pending */
+	STARTING:  3, /* First row is being drawn - other rows pending */
+	UPDATING:  4, /* Performing pending draws */
+	RESETTING: 5  /* Waiting for any drawing operations to be canceled */
 };
 
 export const TableAction = {
-	'START': 0,          /* Draw first row */
-	'BUILD-START': 1,    /* Start drawing pending rows */
-	'BUILD-COMPLETE': 2, /* All drawings completed */
-	'SCROLL': 3,    /* Scroll to a row within current window - possibly add further rows */
-	'RESET': 6      /* Focus a row outside the current window */
+	START:           1,
+	START_COMPLETE:  2,
+	FOCUS:           3,
+	SCROLL:          4,
+	SCROLL_COMPLETE: 5,
+	RESTART:         6
 };
 
 class StateMachine {
 	constructor(initialState) {
-		that = this;
 		this.state = initialState;
 		this.callbacks = [];
 		this.transitions = {};
@@ -33,14 +33,14 @@ class StateMachine {
 	_transitState(newState) {
 		const oldState = this.state;
 		this.state = newState;
-		for(cb in this.callbacks) {
+		for(let cb of this.callbacks) {
 			cb(oldState, newState);
 		}
 	}
 	
 	trigger(action, promise) {
 		const that = this;
-		if(this.tranistions[this.state] && this.transitions[this.state][action]) {
+		if(this.transitions[this.state] && this.transitions[this.state][action]) {
 			return new Promise((resolve, reject) => {
 				const finalize = () => {
 					that._transitState(that.transitions[that.state][action]);
@@ -64,7 +64,7 @@ class StateMachine {
 	
 	onStateEnter(state, callback) {
 		if(typeof callback == 'function') {
-			this.onChange(function(oldState, newState) {
+			this.onStateChange(function(oldState, newState) {
 				if(newState == state) {
 					callback();
 				}
@@ -74,7 +74,7 @@ class StateMachine {
 	
 	onStateLeave(state, callback) {
 		if(typeof callback == 'function') {
-			this.onChange(function(oldState, newState) {
+			this.onStateChange(function(oldState, newState) {
 				if(oldState == state) {
 					callback();
 				}
@@ -82,7 +82,7 @@ class StateMachine {
 		}
 	}
 	
-	onChange(callback) {
+	onStateChange(callback) {
 		if(typeof callback == 'function') {
 			this.callbacks.push(callback);
 		}
@@ -90,14 +90,14 @@ class StateMachine {
 };
 
 export class TableStateMachine extends StateMachine {
-	construct() {
+	constructor() {
 		super(TableState.EMPTY);
-		this._addTransition(TableState.EMPTY, TableAction.START, TableState.STARTED);
+		this._addTransition(TableState.EMPTY, TableAction.START, TableState.STARTING);
 		
-		this._addTransition(TableState.STARTED, TableAction.BUILD-START, TableState.UPDATING);
-		this._addTransition(TableState.STARTED, TableAction.FOCUS, TableState.RESETTING);
+		this._addTransition(TableState.STARTING, TableAction.SCROLL, TableState.UPDATING);
+		this._addTransition(TableState.STARTING, TableAction.FOCUS, TableState.RESETTING);
 		
-		this._addTransition(TableState.UPDATING, TableAction.BUILD-COMPLETE, TableState.IDLE);
+		this._addTransition(TableState.UPDATING, TableAction.SCROLL_COMPLETE, TableState.IDLE);
 		this._addTransition(TableState.UPDATING, TableAction.SCROLL, TableState.UPDATING);
 		this._addTransition(TableState.UPDATING, TableAction.FOCUS, TableState.RESETTING);
 		
@@ -105,6 +105,6 @@ export class TableStateMachine extends StateMachine {
 		this._addTransition(TableState.IDLE, TableAction.FOCUS, TableState.RESETTING);
 		
 		this._addTransition(TableState.RESETTING, TableAction.FOCUS, TableState.RESETTING);
-		this._addTransition(TableState.RESETTING, TableAction.START, TableState.STARTED);
+		this._addTransition(TableState.RESETTING, TableAction.START, TableState.STARTING);
 	}
 };

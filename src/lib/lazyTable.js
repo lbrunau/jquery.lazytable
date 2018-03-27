@@ -197,7 +197,7 @@ export default function LazyTable(options) {
 			// more rows at the bottom of the table are needed
 			animations.push(build(
 					() => nextIter.next(),
-					(targetWindow) => (stateMachine.getState() == TableState.UPDATING) && nextIter.hasNext() && nextIter.getCurrent() <= targetWindow.bottom,
+					(targetWindow) => (stateMachine.getState() != TableState.RESETING) && nextIter.hasNext() && nextIter.getCurrent() <= targetWindow.bottom,
 					html => {
 						settings.appendFn(html);
 						table.css({'margin-bottom': (settings.data.length - nextIter.getCurrent()) * settings.trHeight});
@@ -211,7 +211,7 @@ export default function LazyTable(options) {
 			// more rows at the top of the table are needed
 			animations.push(build(
 					() => prevIter.prev(),
-					(targetWindow) => (stateMachine.getState() == TableState.UPDATING) && prevIter.hasPrev() && prevIter.getCurrent() > targetWindow.top,
+					(targetWindow) => (stateMachine.getState() != TableState.RESETING) && prevIter.hasPrev() && prevIter.getCurrent() > targetWindow.top,
 					html => {
 						settings.prependFn(html.reverse());
 						table.css({'margin-top': prevIter.getCurrent() * settings.trHeight});
@@ -228,26 +228,12 @@ export default function LazyTable(options) {
 					if(!settings.keepExisting) {
 						free();
 					}
-					if(settings.debug) {
-						const n = nextIter.getCurrent() - prevIter.getCurrent();
-						const marginTopStr = table.css('margin-top');
-						const marginTop = parseInt(marginTopStr.substr(0, marginTopStr.length - 2));
-						const marginBotStr = table.css('margin-bottom');
-						const marginBot = parseInt(marginBotStr.substr(0, marginBotStr.length - 2));
-						console.log('[jQuery.Lazytable] nVisible: ' + n);
-						console.assert(((marginTop + marginBot) == (settings.data.length - n) * settings.trHeight), {
-							"message": "margin claculation wrong",
-							"nTotal": settings.data.length, 
-							"nVisible": n,
-							"top": marginTop,
-							"bottom": marginBot,
-							"trHeight": settings.trHeight
-						});
-					}
 					if(typeof(settings.onRedraw) === 'function') {
 						settings.onRedraw();
 					}			
 				});					
+			}).then(() => {
+				stateMachine.trigger(TableAction.SCROLL_COMPLETE);
 			});				
 		}
 	};
@@ -424,6 +410,28 @@ export default function LazyTable(options) {
 	 * Start all up.
 	 */
 	const init = function() {
+		if(settings.debug) {
+			stateMachine.onStateChange((oldState, newState) => {
+				console.log('[jQuery.Lazytable] State change: ' + oldState + ' -> ' + newState);
+			});
+			stateMachine.onStateEnter(TableState.IDLE, () => {
+				const n = nextIter.getCurrent() - prevIter.getCurrent();
+				const marginTopStr = table.css('margin-top');
+				const marginTop = parseInt(marginTopStr.substr(0, marginTopStr.length - 2));
+				const marginBotStr = table.css('margin-bottom');
+				const marginBot = parseInt(marginBotStr.substr(0, marginBotStr.length - 2));
+				console.log('[jQuery.Lazytable] nVisible: ' + n);
+				console.assert(((marginTop + marginBot) == (settings.data.length - n) * settings.trHeight), {
+					"message": "margin claculation wrong",
+					"nTotal": settings.data.length, 
+					"nVisible": n,
+					"top": marginTop,
+					"bottom": marginBot,
+					"trHeight": settings.trHeight
+				});
+			});
+		}
+		
 		// remove old event handlers
 		that.off('scroll');
 		that.off('lazytable:focus');
