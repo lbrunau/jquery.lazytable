@@ -1,5 +1,5 @@
 import TableRowIterator from "./tableRowIterator.js";
-import {TableState, TableAction, TableStateMachine} from "./tableState.js";
+import {TableState, TableAction, TableStateMachine} from "./tableStateMachine.js";
 
 export default function LazyTable(options) {
 	/*
@@ -440,7 +440,7 @@ export default function LazyTable(options) {
 		// current state (the state machine's state):
 		//  - class "empty" is set in state "empty"
 		//  - class "loading" is set in any state other than "empty" or "idle"
-		table.addClass('empty');
+		table.addClass('empty'); // no rows added yet -> inital state is "EMPTY"
 		stateMachine.onStateLeave(TableState.EMPTY, () => {
 			table.removeClass('empty');
 			table.addClass('loading');
@@ -466,7 +466,6 @@ export default function LazyTable(options) {
 		that.css({'overflow-y': 'hidden'});
 
 		start(settings.startIndex, true).then(function() {
-			focusedIndex = settings.startIndex;
 			return center(settings.startIndex);
 		}).then(onUpdate).then(function() {
 			// reset overflow to 'scroll'
