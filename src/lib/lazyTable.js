@@ -45,6 +45,7 @@ export default function LazyTable(options) {
 	nextIter.setCurrent(settings.startIndex);
 	const prevIter = nextIter.clone();
 	
+	/* State machine for handling table states and transitions. */
 	const stateMachine = new TableStateMachine();
 	
 	/* Flag to indicate that a resize event is being worked on already. */
@@ -145,6 +146,8 @@ export default function LazyTable(options) {
 				console.log('[jQuery.Lazytable] top -' + (targetWindow.top - currentWindow.top) + ' rows');					
 			}
 		}
+		// no Promise - return immediately: deleted rows have been out of 
+		// visible area anyway
 	};
 
 	
@@ -316,7 +319,7 @@ export default function LazyTable(options) {
 	const restart = function(index) {
 		return start(index, false).then(function() {
 			return center(index);
-		});
+		}).then(onUpdate);
 	};
 	
 	
@@ -432,10 +435,29 @@ export default function LazyTable(options) {
 			});
 		}
 		
+		
+		// Add descriptive classes to the table's DOM element based on the
+		// current state (the state machine's state):
+		//  - class "empty" is set in state "empty"
+		//  - class "loading" is set in any state other than "empty" or "idle"
+		table.addClass('empty');
+		stateMachine.onStateLeave(TableState.EMPTY, () => {
+			table.removeClass('empty');
+			table.addClass('loading');
+		});
+		stateMachine.onStateEnter(TableState.IDLE, () => {
+			table.removeClass('loading');
+		});
+		stateMachine.onStateLeave(TableState.IDLE, () => {
+			table.addClass('loading');
+		});
+		
+		
 		// remove old event handlers
 		that.off('scroll');
 		that.off('lazytable:focus');
 		that.off('lazytable:resize');
+
 		
 		// Temporarily setting the overflow property to 'hidden'
 		// during initialisation fixes a bug related to scrollTop 
