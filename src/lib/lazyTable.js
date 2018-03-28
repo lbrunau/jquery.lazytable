@@ -55,6 +55,12 @@ export default function LazyTable(options) {
 	var focusedIndex = false;
 	
 	
+	/* 
+	 * *********************************
+	 * *****    Helper function    *****
+	 * *********************************
+	 */
+	
 	/*
 	 * Wait until at least one row is being drawn.
 	 */
@@ -180,6 +186,69 @@ export default function LazyTable(options) {
 	};
 	
 	
+	/* 
+	 * Move a certain index to center of window, if possible. 
+	 */
+	const center = function(index) {
+		return new Promise((resolve, reject) => {
+			const top = Math.min(
+					Math.max(index * settings.trHeight - (that.innerHeight() - settings.trHeight)/2, 0),
+					that.prop('scrollHeight')
+			);
+			that.scrollTop(top);
+			window.setTimeout(resolve, 16);			
+		});
+	};
+	
+	
+	/*
+	 * Scroll the visible window until the specified index is visible.
+	 */
+	function scrollTo(index) {
+		return new Promise((resolve, reject) => {
+			/*
+			 * If the desired index is within the currently active area,
+			 * the table window will scroll until the desired index reaches
+			 * the window's visible area.
+			 */
+			const offset = index * settings.trHeight;
+			const windowTop = that.scrollTop();
+			const windowHeight = that.innerHeight();
+
+			// Do not center index, as it is already within current viewport.
+			// Only adjust position, if it is only partly visible.
+			var scrollTop = -1;
+			if(offset + settings.trHeight > windowTop + windowHeight) {
+				scrollTop = Math.max(0, offset - (windowHeight - settings.trHeight));
+			} else if(offset < windowTop ) {
+				scrollTop = offset;
+			}
+			if(scrollTop >= 0) {
+				that.scrollTop(scrollTop);	
+			}
+			window.setTimeout(resolve, 16);			
+		});
+	};
+	
+	
+	/*
+	 * Restart table drawing at a given index.
+	 * The index will be centered.
+	 */
+	const restart = function(index) {
+		return start(index, false).then(function() {
+			return center(index);
+		}).then(onUpdate);
+	};
+	
+
+	
+	/*
+	 * ******************************************
+	 * *****    Event- (State-) Handlers    *****
+	 * ******************************************
+	 */
+	
 	/*
 	 * Update the set of rendered rows based on the current scroll position.
 	 * This function should be called every time the scroll position changes.
@@ -242,21 +311,6 @@ export default function LazyTable(options) {
 	};
 	
 	
-	/* 
-	 * Move a certain index to center of window, if possible. 
-	 */
-	const center = function(index) {
-		return new Promise((resolve, reject) => {
-			const top = Math.min(
-					Math.max(index * settings.trHeight - (that.innerHeight() - settings.trHeight)/2, 0),
-					that.prop('scrollHeight')
-			);
-			that.scrollTop(top);
-			window.setTimeout(resolve, 16);			
-		});
-	};
-	
-	
 	/*
 	 * Focus an index - move it to the visible part of the window.
 	 * If index is outside the current window, the table will be
@@ -279,47 +333,6 @@ export default function LazyTable(options) {
 		return stateMachine.trigger(TableAction.RESET).then(() => {
 			return restart(index);
 		});
-	};
-	
-	
-	/*
-	 * Scroll the visible window until the specified index is visible.
-	 */
-	function scrollTo(index) {
-		return new Promise((resolve, reject) => {
-			/*
-			 * If the desired index is within the currently active area,
-			 * the table window will scroll until the desired index reaches
-			 * the window's visible area.
-			 */
-			const offset = index * settings.trHeight;
-			const windowTop = that.scrollTop();
-			const windowHeight = that.innerHeight();
-
-			// Do not center index, as it is already within current viewport.
-			// Only adjust position, if it is only partly visible.
-			var scrollTop = -1;
-			if(offset + settings.trHeight > windowTop + windowHeight) {
-				scrollTop = Math.max(0, offset - (windowHeight - settings.trHeight));
-			} else if(offset < windowTop ) {
-				scrollTop = offset;
-			}
-			if(scrollTop >= 0) {
-				that.scrollTop(scrollTop);	
-			}
-			window.setTimeout(resolve, 16);			
-		});
-	};
-	
-	
-	/*
-	 * Restart table drawing at a given index.
-	 * The index will be centered.
-	 */
-	const restart = function(index) {
-		return start(index, false).then(function() {
-			return center(index);
-		}).then(onUpdate);
 	};
 	
 	
@@ -477,7 +490,8 @@ export default function LazyTable(options) {
 
 			// add event handlers
 			that.on('scroll', function() {
-				onUpdate();
+				// use an animationFrame to prevent from scroll-linked effects
+				window.requestAnimationFrame(onUpdate);
 			});
 			that.on('lazytable:focus', function(event, index, callback) {
 				onFocus(index).then(function() {

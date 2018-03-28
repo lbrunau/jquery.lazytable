@@ -25,7 +25,7 @@ export const TableState = {
 	IDLE:      2, /* Table drawn - no drawings pending */
 	STARTING:  3, /* First row is being drawn - other rows pending */
 	UPDATING:  4, /* Performing pending draws */
-	RESETTING: 5  /* Waiting for any drawing operations to be canceled */
+	RESETTING: 5  /* Cancel all drawing operations */
 };
 
 export const TableAction = {

@@ -9,8 +9,10 @@
 export default class StateMachine {
 	
 	/**
-	 * Create a new StateMachine with a given initial state.
-	 * The machine does not have any transitions yet.
+	 * Create a new StateMachine with a given initial state. The machine does 
+	 * not have any transitions yet. You must add transitions before calling 
+	 * the "trigger" method for the first time. Triggering an undefined 
+	 * (state,action)-pair will raise an exception.
 	 */
 	constructor(initialState) {
 		this.state = initialState;
@@ -18,6 +20,10 @@ export default class StateMachine {
 		this.transitions = {};
 	}
 	
+	/**
+	 * Add a transition from oldState when receiving a given action.
+	 * The new state will be newState.
+	 */
 	addTransition(oldState, action, newState) {
 		if(!this.transitions[oldState]) {
 			this.transitions[oldState] = {};
@@ -33,6 +39,14 @@ export default class StateMachine {
 		}
 	}
 	
+	/**
+	 * Trigger an action. The state transition will be done 
+	 * - immediately, if "promise" is a function or
+	 * - or when "promise" is resolved, in case it is a Promise.
+	 * 
+	 * This method may throw an exception when no appropriate 
+	 * transition has been defined.
+	 */
 	trigger(action, promise) {
 		const that = this;
 		if(this.transitions[this.state] && this.transitions[this.state][action]) {
@@ -52,10 +66,18 @@ export default class StateMachine {
 		throw new Exception('Undefined state transition: {state: ' + this.state + ', action: ' + action + '}');
 	}
 	
+	
+	/**
+	 * Get the current state.
+	 */
 	getState() {
 		return this.state;
 	}
 	
+	
+	/**
+	 * Callback function that will be executed when a given state is entered.
+	 */
 	onStateEnter(state, callback) {
 		if(typeof callback == 'function') {
 			this.onStateChange(function(oldState, newState) {
@@ -66,6 +88,10 @@ export default class StateMachine {
 		}
 	}
 	
+	
+	/**
+	 * Callback function that will be executed when a given state is left.
+	 */
 	onStateLeave(state, callback) {
 		if(typeof callback == 'function') {
 			this.onStateChange(function(oldState, newState) {
@@ -76,6 +102,10 @@ export default class StateMachine {
 		}
 	}
 	
+	
+	/**
+	 * Callback function that will be executed on any state change.
+	 */
 	onStateChange(callback) {
 		if(typeof callback == 'function') {
 			this.callbacks.push(callback);
