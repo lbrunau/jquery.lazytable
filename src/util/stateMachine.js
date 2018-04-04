@@ -63,7 +63,7 @@ export default class StateMachine {
 			});
 		}
 		
-		throw new Exception('Undefined state transition: {state: ' + this.state + ', action: ' + action + '}');
+		throw 'Undefined state transition: {state: ' + this.state + ', action: ' + action + '}';
 	}
 	
 	

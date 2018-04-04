@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = {
-  entry: {'jquery.lazytable': ['core-js/fn/promise', './src/main.js']},
+  entry: {'jquery.lazytable': ['core-js/es6/symbol', 'core-js/fn/promise', './src/main.js']},
   resolve: {
     extensions: ['.js']
   },

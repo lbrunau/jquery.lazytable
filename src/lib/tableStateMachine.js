@@ -11,10 +11,11 @@
  *                   |    |            |                           |
  *                   |    |  reset     v               reset       |
  *                   |    +--------> (RESETTING) <-----------------+
- *                   |                 |
- *                   +-----------------+
- *                         start
- *                         
+ *                   |                 |  |   ^
+ *                   +-----------------+  |   |
+ *                         start          +---+
+ *                                        scroll
+ *
  * ******************************************************************
  */
 
@@ -52,5 +53,6 @@ export class TableStateMachine extends StateMachine {
 		
 		this.addTransition(TableState.RESETTING, TableAction.RESET, TableState.RESETTING);
 		this.addTransition(TableState.RESETTING, TableAction.START, TableState.STARTING);
+		this.addTransition(TableState.RESETTING, TableAction.SCROLL, TableState.RESETTING);
 	}
 };
