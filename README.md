@@ -51,6 +51,7 @@ $('#tableWrapper').LazyTable({
 * Automatically add wrapper div to provide scrolling. Give height as an initialization parameter.
 * Allow underlying data set to be extended on demand.
 * Provide a more abstract model of the underlying data, to allow data being fetched from WebWorkers, JavaScript databases, etc.
+* Add width-breakpoints for responsive design.
 
 ## Development
 Use `npm install` to download necessary packages.

@@ -373,17 +373,23 @@ export default function LazyTable(options) {
 						 * use the first row's height to calculate margins.
 						 */
 				
-						waitForRow().then(function(row) {
-							const cs = window.getComputedStyle(row);
-							const cssHeight = cs.getPropertyValue('height');
-							const matches = cssHeight.match(/([\.\d]+)px/);
+						waitForRow().then(
+							(row) => {
+								const cs = window.getComputedStyle(row);
+								const cssHeight = cs.getPropertyValue('height');
+								const matches = cssHeight.match(/([\.\d]+)px/);
 					
-							if(matches) {
-								settings.trHeight = parseFloat(matches[1]);
-							} else {
-								settings.trHeight = row.offsetHeight;
-							}
-						}).then(finalize);
+								if(matches) {
+									settings.trHeight = parseFloat(matches[1]);
+								} else {
+									settings.trHeight = row.offsetHeight;
+								}
+							},
+							() => {
+								if(settings.debug) {
+									console.log('[jQuery.Lazytable] start table draw failed due to rejected row promise');
+								}
+							}).then(finalize);
 					} else {
 						finalize();
 					}
@@ -399,26 +405,33 @@ export default function LazyTable(options) {
 	 * Restore table after table window div has been resized.
 	 */
 	const onResize = function() {
-		return waitForRow().then(row => {
-			const cssHeight = window.getComputedStyle(row).getPropertyValue('height');
-			var matches;
-			const height = (matches = cssHeight.match(/([\.\d]+)px/)) ? parseFloat(matches[1]) : row.offsetHeight;
+		return waitForRow().then(
+			(row) => {
+				const cssHeight = window.getComputedStyle(row).getPropertyValue('height');
+				var matches;
+				const height = (matches = cssHeight.match(/([\.\d]+)px/)) ? parseFloat(matches[1]) : row.offsetHeight;
 			
-			if((height > 0) && (height != settings.trHeight)) {
-				// height has changed
-				settings.trHeight = height;
+				if((height > 0) && (height != settings.trHeight)) {
+					// height has changed
+					settings.trHeight = height;
 				
-				const startIndex = focusedIndex ? focusedIndex : Math.min(Math.floor((prevIter.getCurrent() + nextIter.getCurrent()) / 2), settings.data.length -1);
+					const startIndex = focusedIndex ? focusedIndex : Math.min(Math.floor((prevIter.getCurrent() + nextIter.getCurrent()) / 2), settings.data.length -1);
 				
-				return restart(startIndex);
+					return restart(startIndex);
+				}
+			
+				if(focusedIndex) {
+					// height has not changed, but focuse row 
+					// might have gone out of visible area
+					return onFocus(focusedIndex);
+				}			
+			},
+			() => {
+				if(settings.debug) {
+					console.log('[jQuery.Lazytable] Resize failed due to rejected row promise');					
+				}
 			}
-			
-			if(focusedIndex) {
-				// height has not changed, but focuse row 
-				// might have gone out of visible area
-				return onFocus(focusedIndex);
-			}			
-		});
+		);
 	};
 	
 	
@@ -478,9 +491,7 @@ export default function LazyTable(options) {
 		// See: https://code.google.com/p/android/issues/detail?id=19625#c25
 		that.css({'overflow-y': 'hidden'});
 
-		start(settings.startIndex, true).then(function() {
-			return center(settings.startIndex);
-		}).then(onUpdate).then(function() {
+		const finalize = () => {
 			// reset overflow to 'scroll'
 			that.css({'overflow-y': 'scroll'});
 
@@ -501,14 +512,25 @@ export default function LazyTable(options) {
 				});
 			});
 			that.on('lazytable:resize', function() {
-				if(!resizeAnimationWorking) {
+				if(!resizeAnimationWorking && settings.data.length > 0) {
 					resizeAnimationWorking = true;
 					onResize().then(onUpdate).finally(function() {
 						resizeAnimationWorking = false;
 					});
 				}
-			});
-		});
+			});			
+		};
+		
+		if(settings.data.length > 0) {
+			console.log('START: ' + settings.data.length);
+			start(settings.startIndex, true).then(function() {
+				return center(settings.startIndex);
+			}).then(onUpdate).then(finalize);			
+		} else {
+			// stay in empty state
+			console.log('EMPTY');
+			finalize();
+		}
 	};
 	init();
 	

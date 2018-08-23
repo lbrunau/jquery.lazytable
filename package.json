@@ -1,6 +1,6 @@
 {
   "name": "jquery.lazytable",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "jQuery plugin for huge tables - rendering visible rows only",
   "license": "MIT",
   "author": "lbrunau",
