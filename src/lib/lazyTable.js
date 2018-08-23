@@ -522,13 +522,11 @@ export default function LazyTable(options) {
 		};
 		
 		if(settings.data.length > 0) {
-			console.log('START: ' + settings.data.length);
 			start(settings.startIndex, true).then(function() {
 				return center(settings.startIndex);
 			}).then(onUpdate).then(finalize);			
 		} else {
 			// stay in empty state
-			console.log('EMPTY');
 			finalize();
 		}
 	};
