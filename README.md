@@ -10,7 +10,7 @@ This jQuery plugin is a variant of infinite scroll for tables (although, it curr
 * Underlying data must be provided at initialization as an array.
 
 ## Usage
-Include the dist/jquery.lazytable.min.js file and jQuery (tested with Version 2).
+Include the dist/jquery.lazytable.min.js file and jQuery (tested with Version 2 and 3).
 
 Make your table scrollable by introducing a wrapper div that encloses your table. The wrapper div should have a CSS height and `overflow-y: scroll` set.
 ```html
@@ -47,11 +47,6 @@ $('#tableWrapper').LazyTable({
 * `onInit`: Callback that is invoked when initialization is finished.
 * `onRedraw`: Callback that in invoked when rows are added or removed from the table.
 
-## TODO
-* Automatically add wrapper div to provide scrolling. Give height as an initialization parameter.
-* Allow underlying data set to be extended on demand.
-* Provide a more abstract model of the underlying data, to allow data being fetched from WebWorkers, JavaScript databases, etc.
-* Add width-breakpoints for responsive design.
 
 ## Development
 Use `npm install` to download necessary packages.
