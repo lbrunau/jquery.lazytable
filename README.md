@@ -51,6 +51,6 @@ $('#tableWrapper').LazyTable({
 ## Development
 Use `npm install` to download necessary packages.
 
-Use `npm run build` to create a development build and `npm run deploy` to create a (minified) production build.
+Use `npm run build` to create a development and a (minified) production build.
 
 Use `npm start` and browse to http://localhost:8080/examples/test.html to use webpack's dev server.
